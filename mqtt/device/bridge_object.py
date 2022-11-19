@@ -1,19 +1,15 @@
 import asyncio
 import logging
 import uuid
+import shortuuid
 
-from asyncio_mqtt import Client
+import asyncio_mqtt as aiomqtt
 
 from mqtt.conf.broker_params import CloudBrokerParams as mqttParams
 from mqtt.conf.bridge_info import BridgeInfo as bridgeInfo
-import mqtt.message.generic_message as GenericMessage
-import mqtt.message.device_info_message as DeviceInfoMessage
-from mqtt.resource.photodiode_sensor_resource import PhotoDiodeSensorResource
-
-
-SCORE_CODE = 0x00
-ACCELEROMETER_CODE = 0x01
-
+from mqtt.message.device_info_message import DeviceInfoMessage
+from mqtt.message.generic_message import GenericMessage
+from mqtt.conf.packet_structures import TCPPacketStructures as packetStructures
 
 class BridgeObject:
     """
@@ -23,8 +19,8 @@ class BridgeObject:
     Custom protocol to communicate with MCU
     """
     def __init__(self) -> None:
-        self.id = uuid.uuid4()
-        self.mqtt_client = Client(
+        self.id = str(uuid.uuid4())
+        self.mqtt_client = aiomqtt.Client(
             hostname = mqttParams.BROKER_ADDRESS,
             port = mqttParams.BROKER_PORT,
             clean_session = True,
@@ -34,42 +30,51 @@ class BridgeObject:
         logging.info("SmartObject created: %s", self.id)
 
         # Topic to publish to
-        self.basket_topic = "{0}/{1}/{2}/{3}/{4}".format(
+        self.basket_topic = "{0}/{1}/{2}/{3}/".format(
             mqttParams.BASE_TOPIC,
             mqttParams.COURT_TOPIC,
             self.id,
             mqttParams.BASKET_TOPIC,
-            self.basket,
         )
 
     async def start_tcp_server(self):
         """
         Start TCP server
         """
-        server = await asyncio.start_server(self.handle_client, bridgeInfo.address, bridgeInfo.port)
-        logging.info(f"Server listening at {bridgeInfo.address}:{bridgeInfo.port}")
-        async with server:
-            asyncio.get_event_loop().create_task(server.serve_forever())
+        try:
+            server = await asyncio.start_server(self.handle_client, bridgeInfo.address, bridgeInfo.port)
+            logging.info(f"Server listening at {bridgeInfo.address}:{bridgeInfo.port}")
+            async with server:
+                await server.serve_forever()
+        except Exception as e:
+            logging.error(f"{self.id} failed to start TCP server: {e}")
 
     async def handle_client(self, reader, writer):
-        request = None
-        while request != "q":
-            request = (await reader.read(255))
-            address = writer.get_extra_info('peername')
+        """
+        Callback function to handle client
+        """
+        request = await reader.read(32)
+        if not request:
+            return
+        address = writer.get_extra_info('peername')[0]
 
-            logging.info(f"{self.id} received {request} from {address}")
-            
-            if request[0] == SCORE_CODE:
-                self.on_score(address)
-            elif request[0] == ACCELEROMETER_CODE:
-                x = request[1]
-                y = request[2]
-                z = request[3]
-                self.on_accelerometer(address, x, y, z)
-            elif request[0] == 0x02:
-                self.custom_command()
-            else:
-                logging.error(f"Unknown request from {address}: {request}")
+        logging.info(f"{self.id} received {request} from {address}")
+
+        request_type = request[0]
+        id = str(request[1:])
+        payload = request[5:]
+        
+        if request_type == packetStructures.SCORE_CODE:
+            self.on_score(id)
+        elif request_type == packetStructures.ACCELEROMETER_CODE:
+            x = payload[0]
+            y = payload[1]
+            z = payload[2]
+            self.on_accelerometer(id, x, y, z)
+        elif request_type == packetStructures.CUSTOM_COMMAND_CODE:
+            self.custom_command()
+        else:
+            logging.error(f"Unknown request from {address}: {request}")
 
     async def on_connect(self):
         """
@@ -77,18 +82,19 @@ class BridgeObject:
         Publish retained device info message
         """
         try:
-            await self.mqtt_client.connect()
-            logging.info(f"{self.id} connected to MQTT broker")
+            # logging.info(f"{self.id} connected to MQTT broker")
             message = DeviceInfoMessage(self.id, 
                 bridgeInfo.city,
                 bridgeInfo.manufacturer,
                 bridgeInfo.software_version
             )
             # Publish retained device info message
-            await self.mqtt_client.publish(
-                self.info_topic,
-                message.to_json(),
-                retain=True)
+            async with self.mqtt_client:
+                await self.mqtt_client.publish(
+                    self.basket_topic,
+                    message.to_json(),
+                    retain=True)
+            logging.info(f"{self.id} published retained device info message on topic {self.basket_topic}")
         except Exception as e:
             logging.error(f"{self.id} failed to connect to MQTT broker: {e}")
 
@@ -100,21 +106,25 @@ class BridgeObject:
         """
         if topic and message:
             try:
-                await self.mqtt_client.publish(topic, message)
+                async with self.mqtt_client:
+                    await self.mqtt_client.publish(topic, message)
                 logging.info(f"{self.id} published to topic {topic}: {message}")
             except Exception as e:
                 logging.error(f"{self.id} failed to publish to topic {topic}: {e}")
         else:
             logging.error(f"{self.id} failed to publish to topic {topic}: {message}")
     
-    def on_score(self, address):
+    def on_score(self, id):
         """
         Compose and publish basket data message
+        :param  id: id of the client
         """
         try:
-            message = GenericMessage("SCORE", [address, 1])
+            
+            logging.info(f"{self.id} received score from {id}")
+            message = GenericMessage("SCORE", [id, 1])
             asyncio.get_event_loop().create_task(self.publish_data(
-                topic=self.basket_topic,
+                topic=self.basket_topic+id,
                 message=message.to_json(),
             ))
         except Exception as e:
@@ -123,6 +133,10 @@ class BridgeObject:
     def on_accelerometer(self, address, x, y, z):
         """
         Compose and publish accelerometer data message
+        :address: address of the client
+        :x x-axis value
+        :y y-axis value
+        :z z-axis value
         """
         try:
             message = GenericMessage("ACCELEROMETER", [address, [x, y, z]])
@@ -133,8 +147,17 @@ class BridgeObject:
         except Exception as e:
             logging.error(f"{self.id} failed to publish to topic {self.basket_topic}: {e}")
 
-    def custom_command(self):
+    def custom_command(self, payload):
         """
         Custom command
         """
         pass
+
+    async def start(self):
+        try:
+            logging.info(f"{self.id} bridge device starting")
+            await self.on_connect()
+            await self.start_tcp_server()
+            
+        except Exception as e:
+            logging.error(f"{self.id} bridge device failed to start: {e}")

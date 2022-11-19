@@ -2,8 +2,8 @@ import json
 
 
 class DeviceInfoMessage:
-    def __init__(self, id, city, manufacturer, software_version) -> None:
-        self.id = id
+    def __init__(self, id, city, manufacturer, software_version):
+        self.id = str(id)
         self.city = city
         self.manufacturer = manufacturer
         self.software_version = software_version
