@@ -1,12 +1,10 @@
 import logging
  
-from mqtt.resource.resource_data_listener import Event
 
 class SmartObjectResource:
     def __init__(self, object_id, object_type) -> None:
         self.object_id = object_id
         self.object_type = object_type
-        self.resource_data_listener = Event()
 
     async def notify_update(self, updated_value, **kwargs):
         logging.debug("notify_update: %s", updated_value)
