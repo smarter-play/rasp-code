@@ -1,6 +1,6 @@
 import logging
 import asyncio
-import secrets
+import os
 
 from mqtt.resource.smart_object_resource import SmartObjectResource
 from tcp.client import CustomTCPClient
@@ -9,7 +9,7 @@ TASK_DELAY = 5
 
 class PhotoDiodeSensorResource(SmartObjectResource):
     def __init__(self) -> None:
-        super().__init__(secrets.token_bytes(4), "photodiode_sensor")
+        super().__init__(os.urandom(4), "photodiode_sensor")
         self.tcp_client = CustomTCPClient()
 
     async def start_periodic_update(self):
