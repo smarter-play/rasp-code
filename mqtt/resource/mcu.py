@@ -9,13 +9,13 @@ from tcp.client import CustomTCPClient
 
 TASK_DELAY = 5
 
-class PhotoDiodeSensorResource(SmartObjectResource):
+class MCU(SmartObjectResource):
     """
-    PhotoDiodeSensorResource class for testing purposes in absence of real sensors
+    MCU class for testing purposes in absence of real sensors
     Starts a TCP client that periodically sends a message to the TCP server
     """
     def __init__(self) -> None:
-        super().__init__(os.urandom(4), "photodiode_sensor")
+        super().__init__(os.urandom(4), "mcu")
         self.tcp_client = CustomTCPClient()
 
     async def start_periodic_update(self):
