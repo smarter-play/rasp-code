@@ -1,3 +1,5 @@
+### FOR TESTING ###
+
 import logging
 import asyncio
 import os
@@ -8,6 +10,10 @@ from tcp.client import CustomTCPClient
 TASK_DELAY = 5
 
 class PhotoDiodeSensorResource(SmartObjectResource):
+    """
+    PhotoDiodeSensorResource class for testing purposes in absence of real sensors
+    Starts a TCP client that periodically sends a message to the TCP server
+    """
     def __init__(self) -> None:
         super().__init__(os.urandom(4), "photodiode_sensor")
         self.tcp_client = CustomTCPClient()
