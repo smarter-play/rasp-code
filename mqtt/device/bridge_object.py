@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import uuid
-import shortuuid
 
 import asyncio_mqtt as aiomqtt
 
@@ -32,11 +31,10 @@ class BridgeObject:
         logging.info("SmartObject created: %s", self.id)
 
         # Topic to publish to
-        self.basket_topic = "{0}/{1}/{2}/{3}/".format(
+        self.basket_topic = "{0}/{1}/".format(
             mqttParams.BASE_TOPIC,
-            mqttParams.COURT_TOPIC,
-            self.id,
             mqttParams.BASKET_TOPIC,
+            # + id_canestro
         )
 
     async def start_tcp_server(self):
@@ -56,6 +54,8 @@ class BridgeObject:
     async def handle_client(self, reader, writer):
         """
         Callback function to handle client
+        :param  reader: reader object
+        :param  writer: writer object
         """
         request = await reader.read(32)
         if not request:
@@ -83,7 +83,7 @@ class BridgeObject:
         Publish retained device info message
         """
         try:
-            # logging.info(f"{self.id} connected to MQTT broker")
+            logging.info(f"{self.id} connected to MQTT broker")
             message = DeviceInfoMessage(
                 self.id,
                 bridgeInfo.city,
@@ -140,14 +140,14 @@ class BridgeObject:
     def on_accelerometer(self, id, accX, accY, accZ, gyroX, gyroY, gyroZ, temp):
         """
         Compose and publish accelerometer data message
-        :id: id of the client
-        :accX: accelerometer x value
-        :accY: accelerometer y value
-        :accZ: accelerometer z value
-        :gyroX: gyroscope x value
-        :gyroY: gyroscope y value
-        :gyroZ: gyroscope z value
-        :temp: temperature value
+        :param  id: id of the client
+        :param  accX: accelerometer x value
+        :param  accY: accelerometer y value
+        :param  accZ: accelerometer z value
+        :param  gyroX: gyroscope x value
+        :param  gyroY: gyroscope y value
+        :param  gyroZ: gyroscope z value
+        :param  temp: temperature value
         """
         try:
             message = GenericMessage(
@@ -164,13 +164,14 @@ class BridgeObject:
                 f"{self.id} failed to publish to topic {self.basket_topic}: {e}"
             )
 
-    def custom_button(self, address, buttonIdX):
+    def custom_button(self, id, buttonIdX):
         """
         Custom command
-        :button idX: id of the button
+        :param  id: id of the client
+        :param buttonIdX: state of the button
         """
         try:
-            message = GenericMessage("ACCELEROMETER", [address, [buttonIdX]])
+            message = GenericMessage("ACCELEROMETER", [id, [buttonIdX]])
             asyncio.get_event_loop().create_task(
                 self.publish_data(
                     topic=self.basket_topic,
@@ -183,6 +184,9 @@ class BridgeObject:
             )
 
     async def start(self):
+        """
+        Starts Bridge Object coroutines: cloud mqtt connection & TCP Server
+        """
         try:
             logging.info(f"{self.id} bridge device starting")
             await self.on_connect()
