@@ -2,9 +2,13 @@
 
 import logging
 import asyncio
+import sys
 
 from mqtt.device.bridge_object import BridgeObject
 from mqtt.resource.mcu import MCU
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 async def main():
     try:
