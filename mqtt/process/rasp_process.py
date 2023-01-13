@@ -24,5 +24,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger().handlers[0].setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+
     asyncio.run(main())
