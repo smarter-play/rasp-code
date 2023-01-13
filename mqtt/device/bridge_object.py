@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+import struct
 
 import asyncio_mqtt as aiomqtt
 
@@ -9,7 +10,6 @@ from mqtt.conf.bridge_info import BridgeInfo as bridgeInfo
 from mqtt.message.device_info_message import DeviceInfoMessage
 from mqtt.message.generic_message import GenericMessage
 from mqtt.conf.packet_structures import TCPPacketStructures as packetStructures
-
 
 class BridgeObject:
     """
@@ -43,7 +43,9 @@ class BridgeObject:
         """
         try:
             server = await asyncio.start_server(
-                self.handle_client, bridgeInfo.address, bridgeInfo.port
+                self.handle_client,
+                bridgeInfo.address,
+                bridgeInfo.port,
             )
             logging.info(f"Server listening at {bridgeInfo.address}:{bridgeInfo.port}")
             async with server:
@@ -57,25 +59,24 @@ class BridgeObject:
         :param  reader: reader object
         :param  writer: writer object
         """
-        request = await reader.read(32)
-        if not request:
-            return
+
         address = writer.get_extra_info("peername")[0]
 
-        logging.info(f"{self.id} received {request} from {address}")
+        while True:
+            [packet_type] = struct.unpack('B', await reader.read(1))
+            [basket_id] = struct.unpack('I', await reader.read(4))
 
-        request_type = request[0]
-        id = request[1:5].decode("utf-8", "ignore")
-        payload = request[5:]
+            logging.debug(f"{address} - Received packet: type={packet_type}, basket_id={basket_id}")
 
-        if request_type == packetStructures.SCORE_CODE:
-            self.on_score(id)
-        elif request_type == packetStructures.ACCELEROMETER_CODE:
-            self.on_accelerometer(id, *payload[0:7])
-        elif request_type == packetStructures.CUSTOM_BUTTON_CODE:
-            self.custom_button(id, payload[0])
-        else:
-            logging.error(f"Unknown request from {address}: {request}")
+            if packet_type == packetStructures.SCORE_CODE:
+                await self.on_score(basket_id, reader)
+            elif packet_type == packetStructures.ACCELEROMETER_CODE:
+                await self.on_accelerometer(basket_id, reader)
+            elif packet_type == packetStructures.CUSTOM_BUTTON_CODE:
+                await self.on_custom_button(basket_id, reader)
+            else:
+                logging.error(f"{address} - Unknown packet type: {packet_type}")
+
 
     async def on_connect(self):
         """
@@ -108,27 +109,23 @@ class BridgeObject:
         :param  message: message to publish
         """
         if topic and message:
-            try:
-                async with self.mqtt_client:
-                    await self.mqtt_client.publish(topic, message)
-                logging.info(f"{self.id} published to topic {topic}: {message}")
-            except Exception as e:
-                logging.error(f"{self.id} failed to publish to topic {topic}: {e}")
+            async with self.mqtt_client:
+                await self.mqtt_client.publish(topic, message)
+            logging.info(f"{self.id} published to topic {topic}: {message}")
         else:
             logging.error(f"{self.id} failed to publish to topic {topic}: {message}")
 
-    def on_score(self, id):
-        """
-        Compose and publish basket data message
-        :param  id: id of the client
-        """
-        try:
+    async def on_score(self, basket_id, reader):
+        #payload = No payload!
 
-            logging.info(f"{self.id} received score from {id}")
-            message = GenericMessage("SCORE", [id])
+        logging.debug(f"{basket_id} - Score")
+
+        try:
+            logging.info(f"{self.id} received score from {basket_id}")
+            message = GenericMessage("SCORE", [basket_id])
             asyncio.get_event_loop().create_task(
                 self.publish_data(
-                    topic=self.basket_topic + id,
+                    topic=self.basket_topic + basket_id,
                     message=message.to_json(),
                 )
             )
@@ -137,25 +134,19 @@ class BridgeObject:
                 f"{self.id} failed to publish to topic {self.basket_topic}: {e}"
             )
 
-    def on_accelerometer(self, id, accX, accY, accZ, gyroX, gyroY, gyroZ, temp):
-        """
-        Compose and publish accelerometer data message
-        :param  id: id of the client
-        :param  accX: accelerometer x value
-        :param  accY: accelerometer y value
-        :param  accZ: accelerometer z value
-        :param  gyroX: gyroscope x value
-        :param  gyroY: gyroscope y value
-        :param  gyroZ: gyroscope z value
-        :param  temp: temperature value
-        """
+    async def on_accelerometer(self, basket_id, reader):
+        payload = await reader.read(4 * 7)
+        payload = [acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z, temp] = struct.unpack('fffffff', payload)
+
+        logging.debug(f"{basket_id} - Accelerometer data: {payload}")
+
         try:
             message = GenericMessage(
-                "ACCELEROMETER", [id, accX, accY, accZ, gyroX, gyroY, gyroZ, temp]
+                "ACCELEROMETER", [basket_id, acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z, temp]
             )
             asyncio.get_event_loop().create_task(
                 self.publish_data(
-                    topic=self.basket_topic + id,
+                    topic=self.basket_topic + str(basket_id),
                     message=message.to_json(),
                 )
             )
@@ -164,14 +155,14 @@ class BridgeObject:
                 f"{self.id} failed to publish to topic {self.basket_topic}: {e}"
             )
 
-    def custom_button(self, id, buttonIdX):
-        """
-        Custom command
-        :param  id: id of the client
-        :param buttonIdX: state of the button
-        """
+    async def on_custom_button(self, basket_id, reader):
+        payload = await reader.read(4)
+        payload = [custom_button_idx] = struct.unpack('i', payload)
+
+        logging.debug(f"{basket_id} - Custom button {payload}")
+
         try:
-            message = GenericMessage("ACCELEROMETER", [id, [buttonIdX]])
+            message = GenericMessage("ACCELEROMETER", [basket_id, [custom_button_idx]])
             asyncio.get_event_loop().create_task(
                 self.publish_data(
                     topic=self.basket_topic,
