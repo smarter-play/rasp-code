@@ -108,12 +108,15 @@ class BridgeObject:
         :param  topic: topic to publish to
         :param  message: message to publish
         """
-        if topic and message:
-            async with self.mqtt_client:
-                await self.mqtt_client.publish(topic, message)
-            logging.info(f"{self.id} published to topic {topic}: {message}")
-        else:
-            logging.error(f"{self.id} failed to publish to topic {topic}: {message}")
+        try:
+            if topic and message:
+                async with self.mqtt_client:
+                    await self.mqtt_client.publish(topic, message)
+                    logging.info(f"{self.id} published to topic {topic}: {message}")
+            else:
+                logging.error(f"{self.id} failed to publish to topic {topic}: {message}")
+        except Exception as e:
+            logging.error(f"{self.id} failed to publish to topic. Error {e}")
 
     async def on_score(self, basket_id, reader):
         #payload = No payload!
@@ -123,12 +126,10 @@ class BridgeObject:
         try:
             logging.info(f"{self.id} received score from {basket_id}")
             message = GenericMessage("SCORE", [basket_id])
-            asyncio.get_event_loop().create_task(
-                self.publish_data(
-                    topic=self.basket_topic + basket_id,
+            await self.publish_data(
+                    topic=self.basket_topic + str(basket_id),
                     message=message.to_json(),
                 )
-            )
         except Exception as e:
             logging.error(
                 f"{self.id} failed to publish to topic {self.basket_topic}: {e}"
@@ -144,12 +145,10 @@ class BridgeObject:
             message = GenericMessage(
                 "ACCELEROMETER", [basket_id, acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z, temp]
             )
-            asyncio.get_event_loop().create_task(
-                self.publish_data(
+            await self.publish_data(
                     topic=self.basket_topic + str(basket_id),
                     message=message.to_json(),
                 )
-            )
         except Exception as e:
             logging.error(
                 f"{self.id} failed to publish to topic {self.basket_topic}: {e}"
@@ -163,12 +162,10 @@ class BridgeObject:
 
         try:
             message = GenericMessage("ACCELEROMETER", [basket_id, [custom_button_idx]])
-            asyncio.get_event_loop().create_task(
-                self.publish_data(
-                    topic=self.basket_topic,
+            await self.publish_data(
+                    topic=self.basket_topic + str(basket_id),
                     message=message.to_json(),
                 )
-            )
         except Exception as e:
             logging.error(
                 f"{self.id} failed to publish to topic {self.basket_topic}: {e}"
@@ -179,6 +176,7 @@ class BridgeObject:
         Starts Bridge Object coroutines: cloud mqtt connection & TCP Server
         """
         try:
+
             logging.info(f"{self.id} bridge device starting")
             await self.on_connect()
             await self.start_tcp_server()
