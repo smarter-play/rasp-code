@@ -35,15 +35,21 @@ class Simulator:
         logging.debug(f"{basket_id} - Sent custom button: {custom_button_idx}")
 
     async def start(self, address, port):
-        logging.info(f"Connecting to {address}:{port}...")
-
-        _, writer = await asyncio.open_connection(address, port)
-
-        logging.info(f"Connected")
 
         basket_id = random.getrandbits(32)
 
         logging.info(f"Generated basket ID: {basket_id}")
+
+        logging.info(f"Connecting to {address}:{port}...")
+        while True:
+            try:
+                _, writer = await asyncio.open_connection(address, port)
+                logging.info("Connected successfully")
+            except OSError as e:
+                logging.error(f"Connection Failed! {e}")
+                await asyncio.sleep(5)
+            else:
+                break
 
         while True:
             send_packet_functions = [
