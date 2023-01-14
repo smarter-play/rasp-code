@@ -16,4 +16,4 @@ Located inside `mqtt->conf` folder
 Simply run `python mqtt/process/rasp_process.py`. 
 
 ## Testing
-Inside `resource` folder there is a `mcu` class acting as a simple TCP Client by sending 'random' data to the server. Simply uncomment the relevant code fragments in `rasp_process.py` and re-run.
+You can send simulated packets to the server by running `python simulate.py`.
