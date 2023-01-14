@@ -1,11 +1,8 @@
-### FOR TESTING ###
-
 import asyncio
 import logging
 import random
 import struct
 import sys
-from enum import Enum
 
 PACKET_TYPE_SCORE = 0x00
 PACKET_TYPE_ACCELEROMETER_DATA = 0x01
