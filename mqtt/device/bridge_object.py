@@ -63,10 +63,10 @@ class BridgeObject:
         address = writer.get_extra_info("peername")[0]
 
         while True:
-            [packet_type] = struct.unpack('B', await reader.read(1))
-            [basket_id] = struct.unpack('I', await reader.read(4))
+            [packet_type] = struct.unpack('B', await reader.readexactly(1))
+            [basket_id] = struct.unpack('I', await reader.readexactly(4))
 
-            logging.debug(f"{address} - Received packet: type={packet_type}, basket_id={basket_id}")
+            #logging.debug(f"{address} - Received packet: type={packet_type}, basket_id={basket_id}")
 
             if packet_type == packetStructures.SCORE_CODE:
                 await self.on_score(basket_id, reader)
@@ -112,7 +112,7 @@ class BridgeObject:
             if topic and message:
                 async with self.mqtt_client:
                     await self.mqtt_client.publish(topic, message)
-                    logging.info(f"{self.id} published to topic {topic}: {message}")
+                    #logging.info(f"{self.id} published to topic {topic}: {message}")
             else:
                 logging.error(f"{self.id} failed to publish to topic {topic}: {message}")
         except Exception as e:
@@ -136,7 +136,7 @@ class BridgeObject:
             )
 
     async def on_accelerometer(self, basket_id, reader):
-        payload = await reader.read(4 * 7)
+        payload = await reader.readexactly(4 * 7)
         payload = [acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z, temp] = struct.unpack('fffffff', payload)
 
         logging.debug(f"{basket_id} - Accelerometer data: {payload}")
@@ -155,13 +155,13 @@ class BridgeObject:
             )
 
     async def on_custom_button(self, basket_id, reader):
-        payload = await reader.read(4)
+        payload = await reader.readexactly(4)
         payload = [custom_button_idx] = struct.unpack('i', payload)
 
         logging.debug(f"{basket_id} - Custom button {payload}")
 
         try:
-            message = GenericMessage("ACCELEROMETER", [basket_id, [custom_button_idx]])
+            message = GenericMessage("CUSTOM_BUTTON", [basket_id, [custom_button_idx]])
             await self.publish_data(
                     topic=self.basket_topic + str(basket_id),
                     message=message.to_json(),
