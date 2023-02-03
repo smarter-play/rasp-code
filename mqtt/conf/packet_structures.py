@@ -2,3 +2,4 @@ class TCPPacketStructures:
     SCORE_CODE = 0x00
     ACCELEROMETER_CODE = 0x01
     CUSTOM_BUTTON_CODE = 0x02
+    PEOPLE_DETECTED = 0x03

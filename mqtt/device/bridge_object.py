@@ -66,7 +66,7 @@ class BridgeObject:
             [packet_type] = struct.unpack('B', await reader.readexactly(1))
             [basket_id] = struct.unpack('I', await reader.readexactly(4))
 
-            #logging.debug(f"{address} - Received packet: type={packet_type}, basket_id={basket_id}")
+            #logging.debug(f"{address} - Received packet: type={hex(packet_type)}, basket_id={hex(basket_id)}")
 
             if packet_type == packetStructures.SCORE_CODE:
                 await self.on_score(basket_id, reader)
@@ -74,8 +74,10 @@ class BridgeObject:
                 await self.on_accelerometer(basket_id, reader)
             elif packet_type == packetStructures.CUSTOM_BUTTON_CODE:
                 await self.on_custom_button(basket_id, reader)
+            elif packet_type == packetStructures.PEOPLE_DETECTED:
+                await self.on_people_detected(basket_id, reader)
             else:
-                logging.error(f"{address} - Unknown packet type: {packet_type}")
+                logging.error(f"{address} - Unknown packet type: {hex(packet_type)}")
 
 
     async def on_connect(self):
@@ -162,6 +164,23 @@ class BridgeObject:
 
         try:
             message = GenericMessage("CUSTOM_BUTTON", [basket_id, [custom_button_idx]])
+            await self.publish_data(
+                    topic=self.basket_topic + str(basket_id),
+                    message=message.to_json(),
+                )
+        except Exception as e:
+            logging.error(
+                f"{self.id} failed to publish to topic {self.basket_topic}: {e}"
+            )
+
+    async def on_people_detected(self, basket_id, reader):
+        #payload = No payload!
+
+        logging.debug(f"{basket_id} - People detected")
+
+        try:
+            logging.info(f"{self.id} received people detected from {basket_id}")
+            message = GenericMessage("PEOPLE_DETECTED", [basket_id])
             await self.publish_data(
                     topic=self.basket_topic + str(basket_id),
                     message=message.to_json(),
