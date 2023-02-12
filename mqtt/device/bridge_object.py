@@ -121,7 +121,7 @@ class BridgeObject:
             logging.error(f"{self.id} failed to publish to topic. Error {e}")
 
     async def on_score(self, basket_id, reader):
-        #payload = No payload!
+        await reader.readexactly(1) # Skip the 1 byte payload
 
         logging.debug(f"{basket_id} - Score")
 
@@ -174,7 +174,7 @@ class BridgeObject:
             )
 
     async def on_people_detected(self, basket_id, reader):
-        #payload = No payload!
+        await reader.readexactly(1) # Skip the 1 byte payload
 
         logging.debug(f"{basket_id} - People detected")
 
