@@ -1,12 +1,10 @@
 import json
+from mqtt.message.generic_message import GenericMessage
 
 
-class DeviceInfoMessage:
+class DeviceInfoMessage(GenericMessage):
     def __init__(self, id, city, manufacturer, software_version):
-        self.id = str(id)
-        self.city = city
-        self.manufacturer = manufacturer
-        self.software_version = software_version
+        super().__init__("INFO", [str(id), city, manufacturer, software_version])
     
     def to_json(self):
-        return json.dumps(self, default=lambda o: o.__dict__)
+        return super().to_json()
