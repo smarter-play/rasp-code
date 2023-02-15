@@ -8,6 +8,7 @@ import time
 PACKET_TYPE_SCORE = 0x00
 PACKET_TYPE_ACCELEROMETER_DATA = 0x01
 PACKET_TYPE_CUSTOM_BUTTON = 0x02
+PACKET_TYPE_PEOPLE_DETECTED = 0x03
 
 class Simulator:
     def send_score(self, basket_id, writer):
@@ -35,6 +36,12 @@ class Simulator:
         
         logging.debug(f"{basket_id} - Sent custom button: {custom_button_idx}")
 
+    def send_people_detected(self, basket_id, writer):
+        writer.write(struct.pack('B', PACKET_TYPE_PEOPLE_DETECTED))
+        writer.write(struct.pack('I', basket_id))
+        
+        logging.debug(f"{basket_id} - Sent people detected")
+
     async def start(self, address, port):
 
         basket_id = random.getrandbits(32)
@@ -56,7 +63,8 @@ class Simulator:
             send_packet_functions = [
                 self.send_score,
                 self.send_accelerometer_data,
-                self.send_custom_button
+                self.send_custom_button,
+                self.send_people_detected
             ]
             time.sleep(1)
             send_packet_function = send_packet_functions[random.randrange(len(send_packet_functions))]
