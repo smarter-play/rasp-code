@@ -17,4 +17,4 @@ ADD confs/iptables_off.sh /iptables_off.sh
 
 # Copy and execute init file
 ADD confs/start.sh /start.sh
-CMD ["/bin/sh", "/start.sh"]
+CMD /bin/sh /start.sh

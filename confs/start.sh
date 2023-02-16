@@ -11,6 +11,7 @@ sigterm_handler () {
   cleanup
   exit 0
 }
+
 cleanup () {
   echo -e "${CYAN}[*] Deleting iptables rules...${NOCOLOR}"
   sh /iptables_off.sh || echo -e "${RED}[-] Error deleting iptables rules${NOCOLOR}"
