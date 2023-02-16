@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  ap:
+    build:
+      dockerfile: ap.Dockerfile
+    privileged: true
+    network_mode: host
+  bridge:
+    ports:
+      - 2323:2323
+    build:
+      dockerfile: bridge.Dockerfile
