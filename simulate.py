@@ -14,6 +14,8 @@ class Simulator:
     def send_score(self, basket_id, writer):
         writer.write(struct.pack('B', PACKET_TYPE_SCORE))
         writer.write(struct.pack('I', basket_id))
+
+        writer.write(struct.pack(('B'), 0x00))
         # No payload
         
         logging.debug(f"{basket_id} - Sent score")
@@ -39,6 +41,8 @@ class Simulator:
     def send_people_detected(self, basket_id, writer):
         writer.write(struct.pack('B', PACKET_TYPE_PEOPLE_DETECTED))
         writer.write(struct.pack('I', basket_id))
+
+        writer.write(struct.pack(('B'), 0x00))
         
         logging.debug(f"{basket_id} - Sent people detected")
 
